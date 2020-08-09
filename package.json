@@ -8,5 +8,9 @@
   "dependencies": {
     "discord.js": "^12.2.0",
     "node-fetch": "^2.6.0"
+  },
+  "devDependencies": {
+    "purescript": "^0.13.8",
+    "spago": "^0.15.3"
   }
 }
