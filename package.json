@@ -1,0 +1,12 @@
+{
+  "name": "royo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/rowtype-yoga/royo.git",
+  "author": "Mark Eibes",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^12.2.0",
+    "node-fetch": "^2.6.0"
+  }
+}
