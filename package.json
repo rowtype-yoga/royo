@@ -7,7 +7,7 @@
   "license": "MIT",
   "dependencies": {
     "discord.js": "^12.2.0",
-    "node-fetch": "^2.6.0"
+    "node-fetch": "^2.6.1"
   },
   "devDependencies": {
     "purescript": "^0.13.8",
