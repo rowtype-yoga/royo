@@ -5,6 +5,8 @@ You can edit this file as you like.
 { name = "my-project"
 , dependencies =
   [ "aff-promise"
+  , "affjax"
+  , "argonaut-codecs"
   , "console"
   , "debug"
   , "effect"
@@ -12,7 +14,6 @@ You can edit this file as you like.
   , "milkis"
   , "node-process"
   , "psci-support"
-  , "simple-json"
   , "string-parsers"
   , "stringutils"
   , "web-events"

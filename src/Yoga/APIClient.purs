@@ -1,18 +1,20 @@
 module Yoga.APIClient where
 
 import Prelude
+import Affjax as AX
+import Affjax.RequestBody as RequestBody
+import Affjax.RequestHeader (RequestHeader(..))
+import Affjax.ResponseFormat as ResponseFormat
+import Affjax.StatusCode (StatusCode(..))
+import Data.Argonaut.Core (Json)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
+import Data.Argonaut.Decode.Class (class DecodeJson)
+import Data.Argonaut.Encode (encodeJson)
 import Data.Either (Either(..), either)
+import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Effect.Aff (Aff, attempt, error, message, throwError)
-import Effect.Class (liftEffect)
-import Effect.Exception (throw)
-import Foreign (Foreign)
-import Milkis as M
-import Milkis.Impl.Node (nodeFetch)
-import Simple.JSON (class ReadForeign, read, writeJSON)
-
-fetch ∷ M.Fetch
-fetch = M.fetch nodeFetch
+import Data.MediaType.Common (applicationJSON)
+import Effect.Aff (Aff, error, throwError)
 
 type CompileRequest =
   { code ∷ String }
@@ -20,20 +22,22 @@ type CompileRequest =
 newtype YogaToken = YogaToken String
 
 compileAndRun ∷ YogaToken -> CompileRequest -> Aff (Either CompileResult RunResult)
-compileAndRun (YogaToken bearerToken) body = do
+compileAndRun (YogaToken bearerToken) compileRequest = do
   response <-
-    attempt
-      $ fetch (M.URL "https://rowtype.yoga/api/compileAndRun")
-          { method: M.postMethod
-          , body: writeJSON body
-          , headers:
-            M.makeHeaders
-              { "Authorization": "Bearer " <> bearerToken
-              , "Content-Type": "application/json"
-              }
+    AX.request
+      ( AX.defaultRequest
+          { url = "https://rowtype.yoga/api/compileAndRun"
+          , method = Left POST
+          , content = Just (RequestBody.Json (encodeJson compileRequest))
+          , responseFormat = ResponseFormat.json
+          , headers =
+            [ RequestHeader "Authorization" ("Bearer " <> bearerToken)
+            , ContentType applicationJSON
+            ]
           }
+      )
   case response of
-    Left l ->
+    Left (l ∷ AX.Error) ->
       pure
         ( Left
             { resultType: ""
@@ -42,7 +46,7 @@ compileAndRun (YogaToken bearerToken) body = do
                 , errorCode: ""
                 , errorLink: ""
                 , filename: ""
-                , message: message l
+                , message: AX.printError l
                 , moduleName: Nothing
                 , position:
                   { endColumn: 0
@@ -55,17 +59,13 @@ compileAndRun (YogaToken bearerToken) body = do
               ]
             }
         )
-    Right r -> case M.statusCode r of
-      200 -> M.json r >>= readAff <#> Right
-      422 -> M.json r >>= readAff <#> Left
+    Right { status, body } -> case status of
+      StatusCode 200 -> Right <$> decodeAff body
+      StatusCode 422 -> Left <$> decodeAff body
       code -> throwError (error $ "Unexpected response code " <> show code)
 
-readAff ∷ ∀ a. ReadForeign a => Foreign -> Aff a
-readAff = read >>> orThrow
-
-orThrow ∷ ∀ a s. Show s => Either s a -> Aff a
-orThrow = either (show >>> throw >>> liftEffect) pure
-
+decodeAff ∷ ∀ a. DecodeJson a => Json -> Aff a
+decodeAff body = either (throwError <<< error <<< printJsonDecodeError) pure (decodeJson body)
 type CompileResult =
   { result ∷ Array ErrorOrWarning
   , resultType ∷ String
