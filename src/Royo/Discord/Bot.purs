@@ -127,13 +127,13 @@ prepareCode code =
       moduleMain <> code
     else
       if (startsWith "main =" || contains (Pattern "\nmain =")) code then
-        moduleMain <> importGrimoire <> code
+        moduleMain <> importBasics <> code
       else
-        moduleMain <> importGrimoire <> spyMain <> code 
+        moduleMain <> importBasics <> spyMain <> code 
   where
     moduleMain = "module Main where\n"
 
-    importGrimoire = "import Grimoire\n"
+    importBasics = "import Basics\n"
 
     spyMain = "main = log $ unsafeCoerce $ "
 
