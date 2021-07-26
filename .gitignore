@@ -9,3 +9,8 @@
 /.psa*
 /.spago
 /.psc-ide-port
+nohup.out
+stdout.txt
+stderr.txt
+stdout.log
+royo.js
