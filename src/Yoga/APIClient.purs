@@ -16,14 +16,15 @@ import Data.Maybe (Maybe(..))
 import Data.MediaType.Common (applicationJSON)
 import Effect.Aff (Aff, error, throwError)
 
-type CompileRequest =
-  { code ∷ String }
+type CompileRequest
+  = { code ∷ String }
 
-newtype YogaToken = YogaToken String
+newtype YogaToken
+  = YogaToken String
 
-compileAndRun ∷ YogaToken -> CompileRequest -> Aff (Either CompileResult RunResult)
+compileAndRun ∷ YogaToken → CompileRequest → Aff (Either CompileResult RunResult)
 compileAndRun (YogaToken bearerToken) compileRequest = do
-  response <-
+  response ←
     AX.request
       ( AX.defaultRequest
           { url = "https://rowtype.yoga/api/compileAndRun"
@@ -37,66 +38,66 @@ compileAndRun (YogaToken bearerToken) compileRequest = do
           }
       )
   case response of
-    Left (l ∷ AX.Error) ->
+    Left (l ∷ AX.Error) →
       pure
         ( Left
             { resultType: ""
             , result:
-              [ { allSpans: []
-                , errorCode: ""
-                , errorLink: ""
-                , filename: ""
-                , message: AX.printError l
-                , moduleName: Nothing
-                , position:
-                  { endColumn: 0
-                  , endLine: 0
-                  , startColumn: 0
-                  , startLine: 0
+                [ { allSpans: []
+                  , errorCode: ""
+                  , errorLink: ""
+                  , filename: ""
+                  , message: AX.printError l
+                  , moduleName: Nothing
+                  , position:
+                      { endColumn: 0
+                      , endLine: 0
+                      , startColumn: 0
+                      , startLine: 0
+                      }
+                  , suggestion: Nothing
                   }
-                , suggestion: Nothing
-                }
-              ]
+                ]
             }
         )
-    Right { status, body } -> case status of
-      StatusCode 200 -> Right <$> decodeAff body
-      StatusCode 422 -> Left <$> decodeAff body
-      code -> throwError (error $ "Unexpected response code " <> show code)
+    Right { status, body } → case status of
+      StatusCode 200 → Right <$> decodeAff body
+      StatusCode 422 → Left <$> decodeAff body
+      code → throwError (error $ "Unexpected response code " <> show code)
 
-decodeAff ∷ ∀ a. DecodeJson a => Json -> Aff a
+decodeAff ∷ ∀ a. DecodeJson a ⇒ Json → Aff a
 decodeAff body = either (throwError <<< error <<< printJsonDecodeError) pure (decodeJson body)
-type CompileResult =
-  { result ∷ Array ErrorOrWarning
-  , resultType ∷ String
-  }
+type CompileResult
+  = { result ∷ Array ErrorOrWarning
+    , resultType ∷ String
+    }
 
-type RunResult =
-  { code ∷ Maybe Int, stdout ∷ String, stderr ∷ String }
+type RunResult
+  = { code ∷ Maybe Int, stdout ∷ String, stderr ∷ String }
 
-type Suggestion =
-  { replaceRange ∷ Position, replacement ∷ String }
+type Suggestion
+  = { replaceRange ∷ Position, replacement ∷ String }
 
-type Span =
-  { end ∷ Array Int
-  , name ∷ String
-  , start ∷ Array Int
-  }
+type Span
+  = { end ∷ Array Int
+    , name ∷ String
+    , start ∷ Array Int
+    }
 
-type Position =
-  { endColumn ∷ Int
-  , endLine ∷ Int
-  , startColumn ∷ Int
-  , startLine ∷ Int
-  }
+type Position
+  = { endColumn ∷ Int
+    , endLine ∷ Int
+    , startColumn ∷ Int
+    , startLine ∷ Int
+    }
 
-type ErrorOrWarning =
-  { allSpans ∷ Array Span
-  , errorCode ∷ String
-  , errorLink ∷ String
-  , filename ∷ String
-  , message ∷ String
-  , moduleName ∷ Maybe String
-  , position ∷ Position
-  , suggestion ∷ Maybe Suggestion
-  }
+type ErrorOrWarning
+  = { allSpans ∷ Array Span
+    , errorCode ∷ String
+    , errorLink ∷ String
+    , filename ∷ String
+    , message ∷ String
+    , moduleName ∷ Maybe String
+    , position ∷ Position
+    , suggestion ∷ Maybe Suggestion
+    }

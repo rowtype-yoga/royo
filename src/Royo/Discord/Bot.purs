@@ -1,7 +1,6 @@
 module Royo.Bot where
 
 import Prelude hiding (between)
-
 import Control.Alt (alt)
 import Control.Apply (lift2)
 import Data.Either (Either(..))
@@ -30,118 +29,121 @@ _OTHER_BOT_USER_ID = "741945029056135179"
 mentionPrefix2 ∷ String
 mentionPrefix2 = i "<@&" _OTHER_BOT_USER_ID ">"
 
-printErrors :: Message -> Aff Unit -> Aff Unit
-printErrors msg aff = do 
-  result <- attempt aff
-  case result of 
-    Left e -> log $ "Couldnt' handle message" <>  message e <> "\n" <> msg.content
-    Right _ -> pure unit
+printErrors ∷ Message → Aff Unit → Aff Unit
+printErrors msg aff = do
+  result ← attempt aff
+  case result of
+    Left e → log $ "Couldnt' handle message" <> message e <> "\n" <> msg.content
+    Right _ → pure unit
 
-runBot ∷ YogaToken -> DiscordToken -> Aff Unit
+runBot ∷ YogaToken → DiscordToken → Aff Unit
 runBot yogaToken discordToken = do
-  newClient <- newClient # liftEffect
-  client <- newClient # login discordToken
+  newClient ← newClient # liftEffect
+  client ← newClient # login discordToken
   client # onMessage (launchAff_ <$> messageHandler) # liftEffect
   client # onMessageUpdate (launchAff_ `map map map` messageUpdatedHandler) # liftEffect
   where
-    messageUpdatedHandler _ msg = printErrors msg do
-      msg # react rewindEmoji
-      messageHandler msg
+  messageUpdatedHandler _ msg@{ content } =
+    printErrors msg do
+      when (isMention content) do
+        msg # react rewindEmoji
+        messageHandler msg
 
-    messageHandler msg@{ content, channel } = printErrors msg do
+  messageHandler msg@{ content, channel } =
+    printErrors msg do
       when (isMention content) do
         case parseCodeBlock content of
-          Nothing -> do
+          Nothing → do
             sendBasicInstructions msg
-          Just code -> do
-            res <- compileAndRun yogaToken { code: prepareCode code }
+          Just code → do
+            res ← compileAndRun yogaToken { code: prepareCode code }
             case res of
-              Left cr -> sendCompileProblem msg code cr
-              Right rr -> case NES.fromString rr.stdout, NES.fromString rr.stderr of
-                Just _stdout, _ -> do
+              Left cr → sendCompileProblem msg code cr
+              Right rr → case NES.fromString rr.stdout, NES.fromString rr.stderr of
+                Just _stdout, _ → do
                   msg # react robotMuscleEmoji
                   channel # sendString (NonEmptyString (prepareOutput rr.stdout))
-                Nothing, Just _stderr -> do
+                Nothing, Just _stderr → do
                   msg # react sirenEmoji
                   sendRunProblem msg code rr.stderr
-                _, _ -> channel # sendString (NonEmptyString "Something is weird")
+                _, _ → channel # sendString (NonEmptyString "Something is weird")
 
-sendBasicInstructions :: Message -> Aff Unit 
+sendBasicInstructions ∷ Message → Aff Unit
 sendBasicInstructions msg = do
   msg # react thinkingEmoji
-  dmc <- createDMChannel msg.author
+  dmc ← createDMChannel msg.author
   dmc # sendString (NonEmptyString intro)
   where
-  intro =intercalate "\n"
-    [ "Welcome " <> waveEmoji <> "!"
-    , "I am here to help you to try out some PureScript code!"
-    , "I react to messages that start with @royo and are followed by code in in between backticks. "
-    , "For example:"
-    , ""
-    , "@royo"
-    , "\\`\\`\\`"
-    , "\"Hello World!\""
-    , "\\`\\`\\`"
-    ]
-    
-sendRunProblem ∷ Message -> String -> String -> Aff Unit
+  intro =
+    intercalate "\n"
+      [ "Welcome " <> waveEmoji <> "!"
+      , "I am here to help you to try out some PureScript code!"
+      , "I react to messages that start with @royo and are followed by code in in between backticks. "
+      , "For example:"
+      , ""
+      , "@royo"
+      , "\\`\\`\\`"
+      , "\"Hello World!\""
+      , "\\`\\`\\`"
+      ]
+
+sendRunProblem ∷ Message → String → String → Aff Unit
 sendRunProblem msg code output = do
   msg # react sirenEmoji
-  dmc <- createDMChannel msg.author
+  dmc ← createDMChannel msg.author
   let say x = sendString (NonEmptyString x) dmc
-  say $ "Hey there! I just tried to run your code: \n"
+  say
+    $ "Hey there! I just tried to run your code: \n"
     <> prepareOutput code
     <> "\nHowever, we can still improve a few things about it."
     <> "This is the intel I could gather:"
   say $ output
   say $ "Don't worry, simply edit your original code and I will try again! The compiler and I are here to help you! We're all in this together " <> robotMuscleEmoji
 
-sendCompileProblem ∷ Message -> String -> CompileResult -> Aff Unit
+sendCompileProblem ∷ Message → String → CompileResult → Aff Unit
 sendCompileProblem msg code cr = do
   msg # react sirenEmoji
-  dmc <- createDMChannel msg.author
+  dmc ← createDMChannel msg.author
   let say x = sendString (NonEmptyString x) dmc
-  say $ "Hey there! I just tried to compile your code: \n"
+  say
+    $ "Hey there! I just tried to compile your code: \n"
     <> prepareOutput code
     <> "\nHowever, we can still improve a few things about it."
     <> "This is what the compiler says:"
   say $ compilerMessages
   say $ "Don't worry, simply edit your original code and I will try again! The compiler and I are here to help you! We're all in this together " <> robotMuscleEmoji
   where
-    compilerMessages = intercalate "\n" (prepareOutput <$> (cr.result <#> _.message))
+  compilerMessages = intercalate "\n" (prepareOutput <$> (cr.result <#> _.message))
 
-prepareOutput ∷ String -> String
+prepareOutput ∷ String → String
 prepareOutput s =
   if contains (Pattern "\n") s then
     "```\n" <> s <> "```\n"
   else
     "`" <> s <> "`"
 
-prepareCode ∷ String -> String
+prepareCode ∷ String → String
 prepareCode code =
   if startsWith "module" code then
     code
+  else if startsWith "import " code then
+    moduleMain <> code
+  else if (startsWith "main =" || contains (Pattern "\nmain =")) code then
+    moduleMain <> importBasics <> code
   else
-    if startsWith "import " code then
-      moduleMain <> code
-    else
-      if (startsWith "main =" || contains (Pattern "\nmain =")) code then
-        moduleMain <> importBasics <> code
-      else
-        moduleMain <> importBasics <> spyMain <> code 
+    moduleMain <> importBasics <> spyMain <> code
   where
-    moduleMain = "module Main where\n"
+  moduleMain = "module Main where\n"
+  importBasics = "import Basics\n"
+  spyMain = "main = log $ unsafeCoerce $ "
 
-    importBasics = "import Basics\n"
-
-    spyMain = "main = log $ unsafeCoerce $ "
-
-isMention ∷ String -> Boolean
+isMention ∷ String → Boolean
 isMention = startsWith mentionPrefix1 || startsWith mentionPrefix2
 
-parseCodeBlock ∷ String -> Maybe String
+parseCodeBlock ∷ String → Maybe String
 parseCodeBlock =
-  pure <<< trim
+  pure
+    <<< trim
     >=> pure
     <<< drop (length mentionPrefix1)
     >=> (pure <<< trim)
