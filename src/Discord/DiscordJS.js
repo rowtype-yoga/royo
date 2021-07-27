@@ -17,6 +17,11 @@ exports.onMessageUpdate = (callback) => (client) => () => {
     client.on("messageUpdate", (oldMsg, newMsg) => callback(oldMsg)(newMsg)())
 }
 
+exports.offMessageUpdate = (client) => () => {
+    // TODO: use removeListener?
+    client.removeAllListeners("messageUpdate");
+}
+
 exports.loginImpl = token => client => () => {  
     return client.login(token).then(() => client)
 }

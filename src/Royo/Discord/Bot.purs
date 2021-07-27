@@ -9,23 +9,24 @@ import Data.Foldable (intercalate)
 import Data.Interpolate (i)
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains, drop, length, stripPrefix, stripSuffix, trim)
+import Data.String.NonEmpty as NES
 import Data.String.NonEmpty.Internal (NonEmptyString(..))
-import Data.String.NonEmpty.Internal as NES
 import Data.String.Utils (startsWith)
-import Discord.DiscordJS (ChannelType(..), DiscordToken, Message, createDMChannel, getChannelType, login, newClient, onMessage, onMessageUpdate, react, removeAllReactions, sendString)
-import Effect.Aff (Aff, attempt, launchAff_, message)
+import Discord.DiscordJS (DiscordToken, Message, createDMChannel, login, newClient, offMessageUpdate, onMessage, onMessageUpdate, react, sendString)
+import Effect.Aff (Aff, Milliseconds(..), attempt, delay, error, forkAff, killFiber, launchAff_, message)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
+import Effect.Ref as Effect
 import Yoga.APIClient (CompileResult, YogaToken, compileAndRun)
 
 _BOT_USER_ID ∷ String
-_BOT_USER_ID = "741940687263760475"
+_BOT_USER_ID = "625255925627748363"
 
 mentionPrefix1 ∷ String
 mentionPrefix1 = i "<@!" _BOT_USER_ID ">"
 
 _OTHER_BOT_USER_ID ∷ String
-_OTHER_BOT_USER_ID = "741945029056135179"
+_OTHER_BOT_USER_ID = "625255925627748363"
 
 mentionPrefix2 ∷ String
 mentionPrefix2 = i "<@&" _OTHER_BOT_USER_ID ">"
@@ -41,31 +42,57 @@ runBot ∷ YogaToken -> DiscordToken -> Aff Unit
 runBot yogaToken discordToken = do
   newClient <- newClient # liftEffect
   client <- newClient # login discordToken
-  client # onMessage (launchAff_ <$> messageHandler) # liftEffect
-  client # onMessageUpdate (launchAff_ `map map map` messageUpdatedHandler) # liftEffect
+  client # onMessage (launchAff_ <$> messageHandler client) # liftEffect
   where
-    messageUpdatedHandler _ msg = printErrors msg do
-      when (getChannelType msg.channel == TextChannel) $ removeAllReactions msg
-      msg # react rewindEmoji
-      messageHandler msg
-
-    messageHandler msg@{ content, channel } = printErrors msg do
+    messageHandler client msg@{ content } = printErrors msg do
       when (isMention content) do
-        case parseCodeBlock content of
-          Nothing -> do
-            sendBasicInstructions msg
-          Just code -> do
-            res <- compileAndRun yogaToken { code: prepareCode code }
-            case res of
-              Left cr -> sendCompileProblem msg code cr
-              Right rr -> case NES.fromString rr.stdout, NES.fromString rr.stderr of
-                Just stdout, _ -> do
+        parseAndRun msg
+
+        -- Create a countdown
+        stopFR <- do
+          stopF <- forkAff stopSession
+          Effect.new stopF # liftEffect
+
+        let recvMessage old new =
+              when (msg.id == old.id && msg.id == new.id) do
+                -- Kill countdown
+                stopF_ <- Effect.read stopFR # liftEffect
+                killFiber (error "messageHandler: reset timer") stopF_
+
+                -- Renew countdown
+                stopF <- forkAff stopSession
+                Effect.write stopF stopFR # liftEffect
+
+                parseAndRun new
+
+        -- Register to messageUpdate
+        client # onMessageUpdate (launchAff_ `map map map` recvMessage) # liftEffect
+
+        where
+          -- Unregister from messageUpdate
+          stopSession = do
+            delay (Milliseconds 10_000.0)
+            client # offMessageUpdate # liftEffect
+
+    parseAndRun msg@{ channel, content } = do
+      case parseCodeBlock content of
+        Nothing -> do
+          sendBasicInstructions msg
+        Just code -> do
+          res <- compileAndRun yogaToken { code: prepareCode code }
+          case res of
+            Left cr ->
+              sendCompileProblem msg code cr
+            Right rr ->
+              case NES.fromString rr.stdout, NES.fromString rr.stderr of
+                Just _, _ -> do
                   msg # react robotMuscleEmoji
                   channel # sendString (NonEmptyString (prepareOutput rr.stdout))
-                Nothing, Just stderr -> do
+                Nothing, Just _ -> do
                   msg # react sirenEmoji
                   sendRunProblem msg code rr.stderr
                 _, _ -> channel # sendString (NonEmptyString "Something is weird")
+
 
 sendBasicInstructions :: Message -> Aff Unit 
 sendBasicInstructions msg = do
