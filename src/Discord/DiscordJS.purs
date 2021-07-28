@@ -8,7 +8,7 @@ import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Prim.Row (class Lacks)
 
-foreign import data Client ∷ Row Type -> Type
+foreign import data Client ∷ #Type -> Type
 
 foreign import newClient ∷ Effect (Client ())
 
@@ -40,7 +40,6 @@ type Message =
   { channel ∷ Channel
   , content ∷ String {- not really... -}
   , author ∷ User
-  , id ∷ String {- Snowflake ~ String -}
   }
 
 foreign import removeAllReactionsImpl ∷ Message -> Effect (Promise Unit)
@@ -79,10 +78,6 @@ foreign import onMessage ∷
 
 foreign import onMessageUpdate ∷
   ∀ r. (Message -> Message -> Effect Unit) -> Client ( loggedIn ∷ Void | r ) -> Effect Unit
-
-foreign import offMessageUpdate ::
-  ∀ r. Client ( loggedIn :: Void | r ) -> Effect Unit
-
 
 foreign import sendStringImpl ∷ NonEmptyString -> Channel -> Effect (Promise Unit)
 

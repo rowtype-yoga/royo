@@ -21,7 +21,6 @@ You can edit this file as you like.
   , "node-process"
   , "prelude"
   , "psci-support"
-  , "refs"
   , "strings"
   , "stringutils"
   ]
