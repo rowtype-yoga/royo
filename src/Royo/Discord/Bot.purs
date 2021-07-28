@@ -12,7 +12,7 @@ import Data.String (Pattern(..), contains, drop, length, stripPrefix, stripSuffi
 import Data.String.NonEmpty.Internal (NonEmptyString(..))
 import Data.String.NonEmpty.Internal as NES
 import Data.String.Utils (startsWith)
-import Discord.DiscordJS (ChannelType(..), DiscordToken, Message, createDMChannel, getChannelType, login, newClient, onMessage, onMessageUpdate, react, removeAllReactions, sendString)
+import Discord.DiscordJS (DiscordToken, Message, createDMChannel, login, newClient, onMessage, onMessageUpdate, react, sendString)
 import Effect.Aff (Aff, attempt, launchAff_, message)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
@@ -45,9 +45,9 @@ runBot yogaToken discordToken = do
   client # onMessageUpdate (launchAff_ `map map map` messageUpdatedHandler) # liftEffect
   where
     messageUpdatedHandler _ msg = printErrors msg do
-      when (getChannelType msg.channel == TextChannel) $ removeAllReactions msg
-      msg # react rewindEmoji
-      messageHandler msg
+      when (isMention msg.content) do
+        msg # react rewindEmoji
+        messageHandler msg
 
     messageHandler msg@{ content, channel } = printErrors msg do
       when (isMention content) do
@@ -59,10 +59,10 @@ runBot yogaToken discordToken = do
             case res of
               Left cr -> sendCompileProblem msg code cr
               Right rr -> case NES.fromString rr.stdout, NES.fromString rr.stderr of
-                Just stdout, _ -> do
+                Just _, _ -> do
                   msg # react robotMuscleEmoji
                   channel # sendString (NonEmptyString (prepareOutput rr.stdout))
-                Nothing, Just stderr -> do
+                Nothing, Just _ -> do
                   msg # react sirenEmoji
                   sendRunProblem msg code rr.stderr
                 _, _ -> channel # sendString (NonEmptyString "Something is weird")

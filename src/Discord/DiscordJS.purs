@@ -40,6 +40,7 @@ type Message =
   { channel ∷ Channel
   , content ∷ String {- not really... -}
   , author ∷ User
+  , id ∷ String {- Snowflake ~ String -}
   }
 
 foreign import removeAllReactionsImpl ∷ Message -> Effect (Promise Unit)
