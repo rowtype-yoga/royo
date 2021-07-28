@@ -47,25 +47,28 @@ runBot yogaToken discordToken = do
     messageUpdatedHandler _ msg = printErrors msg do
       when (isMention msg.content) do
         msg # react rewindEmoji
-        messageHandler msg
+        evaluate msg (pure unit)
 
-    messageHandler msg@{ content, channel } = printErrors msg do
-      when (isMention content) do
-        case parseCodeBlock content of
-          Nothing -> do
-            sendBasicInstructions msg
-          Just code -> do
-            res <- compileAndRun yogaToken { code: prepareCode code }
-            case res of
-              Left cr -> sendCompileProblem msg code cr
-              Right rr -> case NES.fromString rr.stdout, NES.fromString rr.stderr of
-                Just _, _ -> do
-                  msg # react robotMuscleEmoji
-                  channel # sendString (NonEmptyString (prepareOutput rr.stdout))
-                Nothing, Just _ -> do
-                  msg # react sirenEmoji
-                  sendRunProblem msg code rr.stderr
-                _, _ -> channel # sendString (NonEmptyString "Something is weird")
+    messageHandler msg = printErrors msg do
+      when (isMention msg.content) do
+        evaluate msg (sendBasicInstructions msg)
+
+    evaluate msg@{ content, channel } doNothing = do
+      case parseCodeBlock content of
+        Nothing ->
+          doNothing
+        Just code -> do
+          res <- compileAndRun yogaToken { code: prepareCode code }
+          case res of
+            Left cr -> sendCompileProblem msg code cr
+            Right rr -> case NES.fromString rr.stdout, NES.fromString rr.stderr of
+              Just _, _ -> do
+                msg # react robotMuscleEmoji
+                channel # sendString (NonEmptyString (prepareOutput rr.stdout))
+              Nothing, Just _ -> do
+                msg # react sirenEmoji
+                sendRunProblem msg code rr.stderr
+              _, _ -> channel # sendString (NonEmptyString "Something is weird")
 
 sendBasicInstructions :: Message -> Aff Unit 
 sendBasicInstructions msg = do
