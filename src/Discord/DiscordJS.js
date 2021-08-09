@@ -1,6 +1,11 @@
 const Discord = require('discord.js');
+const Intent = Discord.Intents.FLAGS
 
-exports.newClient = () => { return new Discord.Client() }
+exports.newClient = () => { 
+	return new Discord.Client(
+		{ intents: [Intent.GUILDS, Intent.GUILD_MESSAGES, Intent.GUILD_MESSAGE_REACTIONS, Intent.DIRECT_MESSAGES, Intent.DIRECT_MESSAGE_REACTIONS] }
+	) 
+}
 
 const once = event => callback => client => () => {
     client.once(event, callback)

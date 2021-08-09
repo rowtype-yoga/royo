@@ -6,7 +6,7 @@
   "author": "Mark Eibes",
   "license": "MIT",
   "dependencies": {
-    "discord.js": "^12.2.0",
+    "discord.js": "^13.0.1",
     "node-fetch": "^2.6.1",
     "xhr2": "^0.2.1"
   },
