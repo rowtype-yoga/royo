@@ -1,7 +1,7 @@
 
-<p align="center"><img src="royo.png"></img></p>
+<p align="center"><img width=50% height=50% src="royo.png"></img></p>
 
-Your friendly [PureScript](https://www.purescript.org/) chat bot for [Discord](https://discord.com/).
+Hi! I'm royo, your friendly [PureScript](https://www.purescript.org/) chat bot for [Discord](https://discord.com/).
 
 ![Image of royo in action](screenshot.png)
 
