@@ -1,5 +1,5 @@
 
-![Portrait of royo](royo.png)
+<p align="center"><img src="royo.png"></img></p>
 
 Your friendly [PureScript](https://www.purescript.org/) chat bot for [Discord](https://discord.com/).
 
