@@ -123,16 +123,12 @@ prepareOutput s =
 
 prepareCode ∷ String -> String
 prepareCode code =
-  if startsWith "module" code then
-    code
-  else
-    if startsWith "import " code then
-      moduleMain <> code
-    else
-      if (startsWith "main =" || contains (Pattern "\nmain =")) code then
-        moduleMain <> importBasics <> code
-      else
-        moduleMain <> importBasics <> spyMain <> code 
+  let prepare 
+      | startsWith "module" code = code
+      | startsWith "import " code = moduleMain <> code
+      | (startsWith "main =" || contains (Pattern "\nmain =")) code = moduleMain <> importBasics <> code
+      | otherwise = moduleMain <> importBasics <> spyMain <> code 
+  in prepare
   where
     moduleMain = "module Main where\n"
 
